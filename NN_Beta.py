@@ -7,7 +7,10 @@ import numpy as np
 from matplotlib import pyplot as plt
 # N is batch size; D_in is input dimension;
 # H is hidden dimension; D_out is output dimension.
-N, D_in, H, D_out = 10, 21, 75, 1
+N, D_in, H, D_out = 10, 21, 50, 1
+tvals=[]
+MLloss=[]
+Kloss=[]
 class Data:
     resName=""
     angle=0.0
@@ -207,7 +210,7 @@ criterion = torch.nn.MSELoss(reduction="mean")
 #using the Adam optimizer
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)#, momentum=0.9 )
 
-for t in range(10000):
+for t in range(5000):
 
     # This part of the code finds a random part of the training data to feed into the NN
     batch_idx = np.random.choice(d_dim, N, replace=False)
@@ -225,6 +228,9 @@ for t in range(10000):
     loss.backward()
     optimizer.step()
     # print out loss
+    tvals+=[t]
+    MLloss+=[loss.item()]
+    Kloss+=[((y.numpy()-(A + B * np.cos(x[:,0,np.newaxis].numpy())+ C * np.cos(2*x[:,0,np.newaxis].numpy())))**2).mean()]
     print(t, loss.item(),((y.numpy()-(A + B * np.cos(x[:,0,np.newaxis].numpy())+ C * np.cos(2*x[:,0,np.newaxis].numpy())))**2).mean())
 
 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
@@ -249,8 +255,10 @@ print(x[:,0,np.newaxis].numpy())
 print(y.numpy())
     # Zero fill, and update NN
 print(loss.item(),((y.numpy()-(A + B * np.cos(x[:,0,np.newaxis].numpy())+ C * np.cos(2*x[:,0,np.newaxis].numpy())))**2).mean())
-
-
+plt.figure(figsize=(20,10))
+plt.title("Plot")
+plt.plot(tvals,MLloss,'r-',tvals,Kloss,'b-')
+plt.show()
 # Things to consider changing
 # 1. Different Activation functions. I am using linear ones right now
 #  but we should see what others are using. This could result in a better
