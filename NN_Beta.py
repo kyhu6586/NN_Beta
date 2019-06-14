@@ -1,4 +1,5 @@
 import math
+import os.path
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -8,6 +9,8 @@ from matplotlib import pyplot as plt
 # N is batch size; D_in is input dimension;
 # H is hidden dimension; D_out is output dimension.
 N, D_in, H, D_out = 10, 21, 50, 1
+#Change thissssss
+proteinFile="1akq_angles+names.txt"
 tvals=[]
 MLloss=[]
 Kloss=[]
@@ -28,6 +31,17 @@ def file_len(fname):
         for i, l in enumerate(f):
             pass
     return i + 1
+
+def give_file_nam(s,i):
+    print(s)
+    if os.path.isfile(s+".png"):
+        print(i)
+        i+=1
+        print(i)
+        return give_file_nam(s[:-1]+str(i),i)
+    else:
+        print(s)
+        return s
 #Hashtable for residues and their corresponding indeces
 dictionary={}
 x="ALA"
@@ -101,7 +115,7 @@ import matplotlib as mpl
 
 #read in training data as numpy arrays
 
-length=file_len("1akq_angles+names.txt")
+length=file_len(proteinFile)
 train_len=3*length/4
 test_len=(length-(3*length/4))-1
 in_train = np.zeros([train_len,1],dtype=np.float32)
@@ -113,8 +127,7 @@ out_test = np.zeros([test_len,1],dtype=np.float32)
 karplus_test = np.zeros([test_len,3],dtype=np.float32)
 residues_test = np.zeros([test_len,20],dtype=np.float32)
 
-#CHANGE THIS 
-f=open("1akq_angles+names.txt","r")
+f=open(proteinFile,"r")
 left=[]
 right=[]
 mid=[]
@@ -254,10 +267,20 @@ print(x[:,0,np.newaxis].numpy())
 #print(y.numpy())
 print(y.numpy())
     # Zero fill, and update NN
-print(loss.item(),((y.numpy()-(A + B * np.cos(x[:,0,np.newaxis].numpy())+ C * np.cos(2*x[:,0,np.newaxis].numpy())))**2).mean())
+title="Protein: "+proteinFile[:4]+", Width="+str(H)+", Number of Input Layers="+str(D_in)
+filenam=proteinFile[:4]+"_"+str(H)+"_"+str(D_in)+"_"+"1"
+filenam=give_file_nam(filenam,1)
+testRes=loss.item(),((y.numpy()-(A + B * np.cos(x[:,0,np.newaxis].numpy())+ C * np.cos(2*x[:,0,np.newaxis].numpy())))**2).mean()
+print(testRes)
 plt.figure(figsize=(20,10))
-plt.title("Plot")
-plt.plot(tvals,MLloss,'r-',tvals,Kloss,'b-')
+plt.title(title)
+plt.xlabel("Neural Network Pass")
+plt.ylabel("Mean Squared Loss per Batch")
+plt.text(3000,4,"test results="+str(testRes))
+plt.savefig(filenam+".png")
+plt.ylim(bottom=0,top=5)
+plt.plot(tvals,MLloss,'b-',linewidth=0.4)
+plt.plot(tvals,Kloss,'r-',linewidth=0.4)
 plt.show()
 # Things to consider changing
 # 1. Different Activation functions. I am using linear ones right now
