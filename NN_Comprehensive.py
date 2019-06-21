@@ -8,12 +8,21 @@ import numpy as np
 from matplotlib import pyplot as plt
 # N is batch size; D_in is input dimension;
 # H is hidden dimension; D_out is output dimension.
-N, D_in, H, D_out = 10, 21, 75, 1
+N, D_in, H, D_out = 5, 21, 50, 1
 #Change thissssss
-proteinFile="combined_angles.txt"
+currWeight=0.5
+numTests=2000
+proteinFile="COMB_angles.txt"
+testFile="1IGD_angles.txt"
 tvals=[]
 MLloss=[]
 Kloss=[]
+MLloss1=[]
+Kloss1=[]
+tvals1=[]
+
+def  weighted_mse_loss(inp, target, weight):
+    return torch.mean(weight**-2*(inp-target)**2)
 class Data:
     resName=""
     angle=0.0
@@ -27,10 +36,13 @@ class Data:
         return self.resName+" "+str(self.angle)
 
 def file_len(fname):
-    with open(fname) as f:
-        for i, l in enumerate(f):
-            pass
-    return i + 1
+    f= open(fname,"r")
+    count=0
+    for line in f:
+        if line!="" and len(line.split())>1:
+            count+=1
+
+    return count+1
 
 def give_file_nam(s,i):
     if os.path.isfile(s+".png"):       
@@ -107,134 +119,84 @@ class MyNeuralNet(torch.nn.Module):
 #        return self.linear3.weight.data.numpy()
         
 
-
+train_len=file_len(proteinFile)
+test_len=file_len(testFile)
 # construct model
 import matplotlib as mpl
 
-
+f=open(proteinFile,"r")
 #read in training data as numpy arrays
-
-length=file_len(proteinFile)
-train_len=3*length/4
-test_len=(length-(3*length/4))-1
 in_train = np.zeros([train_len,1],dtype=np.float32)
 out_train = np.zeros([train_len,1],dtype=np.float32)
 karplus_train = np.zeros([train_len,3],dtype=np.float32)
 residues_train = np.zeros([train_len,20],dtype=np.float32)
+weights = np.ones([train_len,1],dtype=np.float32)
 in_test = np.zeros([test_len,1],dtype=np.float32)
 out_test = np.zeros([test_len,1],dtype=np.float32)
 karplus_test = np.zeros([test_len,3],dtype=np.float32)
 residues_test = np.zeros([test_len,20],dtype=np.float32)
-
+index=0
 f=open(proteinFile,"r")
-left=[]
-right=[]
-mid=[]
 for line in f:
     split=line.split()
-    obj=Data(split[0],float(split[1]),float(split[2]))
-    print(obj.angle)
-    if obj.constant!=0:
-        if float(obj.angle)<-1:
-            left+=[obj]
-        elif float(obj.angle)<1:
-            mid+=[obj]
-        elif float(obj.angle)<6:
-            right+=[obj]
-data=[]
-train_dat=[]
-test_dat=[]
-train_dat+=left[:2]
-train_dat+=right[:2]
-if len(mid)<1:
-    #raise Exception("INVALID DATA INPUT. Make sure your data includes at least two dihedral angles between -1 and 1")
-    data=left[2:]+right[2:]
-elif len(mid)==1 or len(mid)==2:
-    train_dat+=mid[:]
-    data=left[2:]+right[2:]
-else:
-    train_dat+=mid[:2]
-    data=left[2:]+right[2:]+mid[2:]
+    if len(split)>1: 
+        residues_train[index][dictionary[split[0]]]=1
+        residues_train[index][dictionary[split[1]]]=0.2
+        #dihedral angle
+        in_train[index]=float(split[2])
+        #coupling constant
+        out_train[index]=float(split[3])
+        weights[index]=float(currWeight)
+        #for karplus equation comparison
+        karplus_train[index][0]=(float(1))
+        karplus_train[index][1]=(math.cos(float(split[2])))
+        karplus_train[index][2]=(math.cos(2*float(split[2])))
+        index+=1
+    elif len(split)==1:
+        currWeight=split[0]
 
-#Distribute the remaining data randomly 
-random.shuffle(data)
-train_len-=6
-train_data = data[:train_len+1]
-test_data = data[train_len+1:]
+j=open(testFile,"r")
 index=0
-in_train = np.zeros([len(train_data),1],dtype=np.float32)
-out_train = np.zeros([len(train_data),1],dtype=np.float32)
-karplus_train = np.zeros([len(train_data),3],dtype=np.float32)
-residues_train = np.zeros([len(train_data),20],dtype=np.float32)
-in_test = np.zeros([len(test_data),1],dtype=np.float32)
-out_test = np.zeros([len(test_data),1],dtype=np.float32)
-karplus_test = np.zeros([len(test_data),3],dtype=np.float32)
-residues_test = np.zeros([len(test_data),20],dtype=np.float32)
-
-while index<len(train_data):
-    #residue name
-    print(train_data[index].resName)
-    residues_train[index][dictionary[train_data[index].resName]]=1
-    #dihedral angle
-    in_train[index]=float(train_data[index].angle)
-    #coupling constant
-    out_train[index]=float(train_data[index].constant)
-    #for karplus equation comparison
-    karplus_train[index][0]=(float(1))
-    karplus_train[index][1]=(float(math.cos(in_train[index])))
-    karplus_train[index][2]=(float(math.cos(2*in_train[index])))
-    index+=1
-index=0
-while index<len(test_data):
-    #residue name
-    residues_test[index][dictionary[test_data[index].resName]]=1
-    #dihedral angle
-    in_test[index]=float(test_data[index].angle)
-    #coupling constant
-    out_test[index]=float(test_data[index].constant)
-    #for the karplus equation comparison
-    karplus_test[index][0]=(float(1))
-    karplus_test[index][1]=(float(math.cos(in_test[index])))
-    karplus_test[index][2]=(float(math.cos(2*in_test[index])))
-    index+=1
+for line in j:
+    split=line.split()
+    if len(split)>1:
+        residues_test[index][dictionary[split[0]]]=1
+        residues_test[index][dictionary[split[1]]]=0.2
+        #dihedral angle
+        in_test[index]=float(split[2])
+        #coupling constant
+        out_test[index]=float(split[3])
+        index+=1
 wexact = np.linalg.pinv(karplus_train).dot(out_train)
-
 A=wexact[0]
 B=wexact[1]
 C=wexact[2]
-in_trainml=np.cos(in_train)
-in_testml=np.cos(in_test)
-in_train_2= np.concatenate((in_trainml,residues_train),axis=1)
-in_test_2=np.concatenate((in_testml,residues_test),axis=1)
-print(in_train_2)
-print(out_train)
-print(in_test_2)
-print(out_test)
+in_train_2 = np.concatenate((in_train,residues_train),axis=1)
+in_test_2 = np.concatenate((in_test,residues_test),axis=1)
 d_dim = in_train_2.shape[0]
-
-
+print(weights)
 # create NN object
 model = MyNeuralNet(D_in, H, D_out)
 
 # using a mean squared error residual
-criterion = torch.nn.MSELoss(reduction="mean")
+criterion = weighted_mse_loss
 #torch.save(model.state_dict(),"~/pythonpractice"
 
 #using the Adam optimizer
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)#, momentum=0.9 )
-
-for t in range(5000):
-
+#Find the percent that the ML is better than Karplus
+#Find the average distance from expected value for each
+for t in range(10000):
     # This part of the code finds a random part of the training data to feed into the NN
     batch_idx = np.random.choice(d_dim, N, replace=False)
     x = torch.autograd.Variable(torch.from_numpy(in_train_2[batch_idx,:]))
     y = torch.autograd.Variable(torch.from_numpy(out_train[batch_idx]))
-
+    w = torch.autograd.Variable(torch.from_numpy(weights[batch_idx]))
     # Run test data through NN
     y_pred = model(x)
 
     # Calculate Error of NN
-    loss = criterion(y_pred, y)
+    loss = criterion(y_pred, y, w)
 
     # Zero fill, and update NN
     optimizer.zero_grad()
@@ -243,41 +205,45 @@ for t in range(5000):
     # print out loss
     tvals+=[t]
     MLloss+=[loss.item()]
-    Kloss+=[((y.numpy()-(A+B*x[:,0,np.newaxis].numpy()+C*(2*(x[:,0,np.newaxis].numpy()**2) -1)))**2).mean()]
-    print(t, loss.item(),((y.numpy()-(A+B*x[:,0,np.newaxis].numpy()+C*(2*(x[:,0,np.newaxis].numpy()**2) -1)))**2).mean())
-
+    Kloss+=[((w.numpy()**-2)*((y.numpy()-(A + B * np.cos(x[:,0,np.newaxis].numpy())+ C * np.cos(2*x[:,0,np.newaxis].numpy())))**2)).mean()]
+    print(t, loss.item(), Kloss[t])
 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-
-d_dim = in_test_2.shape[0]
-print(d_dim)
-N=10
-print(N)
-print(length)
-batch_idx = np.random.choice(d_dim, N)
-x = torch.autograd.Variable(torch.from_numpy(in_test_2[batch_idx,:]))
-y = torch.autograd.Variable(torch.from_numpy(out_test[batch_idx]))
-
-
+d_dim=in_test_2.shape[0]
+num=0.0
+devML=0.0
+devK=0.0
+criterion = torch.nn.MSELoss(reduction="mean")
+for t in range(numTests):
+    batch_idx = np.random.choice(d_dim, N)
+    x = torch.autograd.Variable(torch.from_numpy(in_test_2[batch_idx,:]))
+    y = torch.autograd.Variable(torch.from_numpy(out_test[batch_idx]))
     # Run test data through NN
-y_pred = model(x)
-
+    y_pred = model(x)
     # Calculate Error of NN
-loss = criterion(y_pred, y)
-#print(x[:,0,np.newaxis].numpy())
-#print(y.numpy())
-#print(y.numpy())
+    loss = criterion(y_pred, y)
+    tvals1+=[t]
+    MLloss1+=[loss.item()]
+    Kloss1+=[((y.numpy()-(A + B * np.cos(x[:,0,np.newaxis].numpy())+ C * np.cos(2*x[:,0,np.newaxis].numpy())))**2).mean()]
+    print(str(MLloss1[t])+" "+str(Kloss1[t]))
+    if MLloss1[t]<Kloss1[t]:
+        num+=1
+    devML+=loss.item()
+    devK+=((y.numpy()-(A+B*np.cos(x[:,0,np.newaxis].numpy())+C *np.cos(2*x[:,0,np.newaxis].numpy())))**2).mean()
     # Zero fill, and update NN
-title="Protein: "+proteinFile[:4]+", Width="+str(H)+", Number of Input Layers="+str(D_in)
-filenam=proteinFile[:4]+"_"+"1lay"+"_"+str(H)+"_"+str(D_in)+"_"+"cheat1"
+title="Protein: "+proteinFile[:4]+", Width="+str(H)+", Number of Input Layers="+str(D_in)+"Test on: "+testFile[:4]
+filenam=proteinFile[:4]+"_"+str(H)+"_"+str(D_in)+"_"+"1"
 filenam=give_file_nam(filenam,1)
-testRes=loss.item(),((y.numpy()-(A+B*x[:,0,np.newaxis].numpy()+C*(2*(x[:,0,np.newaxis].numpy()**2) -1)))**2).mean()
+testRes=(num/numTests)*100
+devML/=numTests
+devK/=numTests
 print(testRes)
 plt.figure(figsize=(20,10))
 plt.title(title)
 plt.xlabel("Neural Network Pass")
 plt.ylabel("Mean Squared Loss per Batch")
-plt.text(3000,4,"test results="+str(testRes))
-plt.ylim(bottom=0,top=5)
+plt.text(3000,4,"test results="+str(testRes)+"%")
+plt.text(3000,3,str(devML)+", "+str(devK))
+plt.ylim(bottom=0,top=20)
 plt.plot(tvals,MLloss,'b-',linewidth=0.4)
 plt.plot(tvals,Kloss,'r-',linewidth=0.4)
 plt.savefig(filenam+".png")
